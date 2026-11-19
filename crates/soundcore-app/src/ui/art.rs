@@ -242,3 +242,94 @@ pub fn app_mark(p: &Painter, r: Rect) {
         );
     }
 }
+
+/// Generic earbuds in front of their case, fitted in `r` (original drawing).
+pub fn earbuds(p: &Painter, r: Rect, accent: Color32) {
+    let pl = pal();
+    let s = r.width().min(r.height()) / 200.0;
+    let c = r.center();
+    let at = |x: f32, y: f32| c + vec2(x * s, y * s);
+    p.add(Shape::convex_polygon(
+        ellipse(at(0.0, 92.0), 80.0 * s, 7.0 * s, 48),
+        Color32::from_black_alpha(if pl.dark { 70 } else { 22 }),
+        Stroke::NONE,
+    ));
+    // Case: rounded pebble with a lid line and a status light.
+    let case = Rect::from_center_size(at(0.0, 52.0), vec2(150.0 * s, 74.0 * s));
+    p.rect_filled(case, CornerRadius::same((30.0 * s) as u8), pl.product);
+    p.hline(
+        case.left() + 10.0 * s..=case.right() - 10.0 * s,
+        case.top() + 26.0 * s,
+        Stroke::new(1.5 * s, pl.product_hi),
+    );
+    p.circle_filled(at(0.0, 70.0), 3.0 * s, accent);
+    // Two buds: round head with a short stem, mirrored.
+    for side in [-1.0f32, 1.0] {
+        let head = at(side * 38.0, -34.0);
+        p.add(Shape::convex_polygon(
+            ellipse(head, 26.0 * s, 24.0 * s, 48),
+            pl.product,
+            Stroke::NONE,
+        ));
+        p.add(Shape::convex_polygon(
+            ellipse(
+                head + vec2(side * 8.0 * s, -4.0 * s),
+                12.0 * s,
+                11.0 * s,
+                32,
+            ),
+            pl.product_hi,
+            Stroke::NONE,
+        ));
+        let stem = Rect::from_min_size(
+            head + vec2(-side * 4.0 * s - 6.0 * s, 10.0 * s),
+            vec2(12.0 * s, 40.0 * s),
+        );
+        p.rect_filled(stem, CornerRadius::same((6.0 * s) as u8), pl.product);
+        p.circle_stroke(
+            head + vec2(-side * 6.0 * s, 2.0 * s),
+            9.0 * s,
+            Stroke::new(2.0 * s, accent),
+        );
+    }
+}
+
+/// Generic portable speaker (original drawing).
+pub fn speaker(p: &Painter, r: Rect, accent: Color32) {
+    let pl = pal();
+    let s = r.width().min(r.height()) / 200.0;
+    let c = r.center();
+    let at = |x: f32, y: f32| c + vec2(x * s, y * s);
+    p.add(Shape::convex_polygon(
+        ellipse(at(0.0, 80.0), 84.0 * s, 7.0 * s, 48),
+        Color32::from_black_alpha(if pl.dark { 70 } else { 22 }),
+        Stroke::NONE,
+    ));
+    let body = Rect::from_center_size(at(0.0, 8.0), vec2(176.0 * s, 132.0 * s));
+    p.rect_filled(body, CornerRadius::same((40.0 * s) as u8), pl.product);
+    for (x, rad) in [(-42.0, 30.0), (42.0, 30.0)] {
+        p.circle_filled(at(x, 8.0), rad * s, pl.product_hi);
+        p.circle_stroke(at(x, 8.0), rad * s, Stroke::new(2.0 * s, accent));
+        p.circle_filled(at(x, 8.0), 9.0 * s, pl.product);
+    }
+}
+
+/// The illustration matching a product kind.
+pub fn product(p: &Painter, kind: soundcore_protocol::Kind, r: Rect, accent: Color32) {
+    match kind {
+        soundcore_protocol::Kind::Headphones => headphones(p, r, accent),
+        soundcore_protocol::Kind::Earbuds => earbuds(p, r, accent),
+        soundcore_protocol::Kind::Speaker => speaker(p, r, accent),
+    }
+}
+
+/// Round "i" badge.
+pub fn info(p: &Painter, c: Pos2, size: f32, color: Color32) {
+    p.circle_filled(c, size / 2.0, color);
+    let s = size / 20.0;
+    p.circle_filled(c + vec2(0.0, -5.0 * s), 1.3 * s, Color32::WHITE);
+    p.line_segment(
+        [c + vec2(0.0, -1.5 * s), c + vec2(0.0, 5.0 * s)],
+        Stroke::new(2.2 * s, Color32::WHITE),
+    );
+}

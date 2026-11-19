@@ -1,5 +1,5 @@
-SOUNDCORE APP pour macOS — version 1.0.0
-Application compagnon pour casques soundcore.
+SOUNDCORE APP pour macOS — version 1.1.0
+Application compagnon pour casques et écouteurs soundcore.
 
 APPLICATION NON OFFICIELLE ET NON HOMOLOGUÉE : elle n'est ni développée, ni
 affiliée, ni approuvée, ni certifiée par Anker Innovations ou soundcore.
@@ -8,16 +8,24 @@ d'Anker Innovations.
 
 COMPATIBILITÉ
 - macOS 11 Big Sur ou plus récent, Mac Apple Silicon et Intel.
-- Casque entièrement pris en charge : soundcore Q20i (A3004).
-- Les autres modèles soundcore sont reconnus, mais leurs réglages ne sont
-  pas encore pris en charge (un message l'indique dans l'app).
+- Environ 40 produits soundcore sont décrits : casques (Q20i, Life Q30,
+  Life Q35, Space One, Space Q45…) et écouteurs (Liberty, Life Note,
+  Life Dot, Space A40, P20i, P30i, P40i, A20i…). La liste complète et le
+  niveau de prise en charge de chacun sont dans le README du projet.
+- Les autres appareils soundcore fonctionnent avec les commandes communes
+  (batterie, firmware, numéro de série) : l'app l'indique.
+- Les enceintes à protocole différent (Motion+) ne sont pas prises en
+  charge.
+- Testé en mode démo ; merci de signaler ce qui marche sur votre appareil.
 
 CE QUE FAIT L'APP
-- Batterie du casque, avec l'indication de charge.
-- Contrôle du bruit : réduction de bruit, normal, transparence. L'app suit
-  aussi les changements faits avec le bouton du casque.
-- Égaliseur : les 22 préréglages du casque, ou votre propre courbe sur
-  8 bandes (±6 dB).
+- Batterie : casque, ou écouteurs gauche et droit et boîtier, avec la
+  charge.
+- Contrôle du bruit : réduction de bruit, normal, transparence, et leurs
+  variantes quand l'appareil en propose. L'app suit aussi les boutons de
+  l'appareil.
+- Égaliseur : les préréglages de l'appareil, ou votre propre courbe sur
+  8 bandes (±6 dB) quand il le permet.
 - Informations : modèle, firmware, numéro de série, adresse Bluetooth.
 - 5 langues (français, anglais, espagnol, allemand, italien), mode clair
   et sombre.
@@ -33,9 +41,9 @@ INSTALLATION
 4. Autorisez l'accès Bluetooth quand macOS le demande.
 
 AVANT DE VOUS CONNECTER
-- Jumelez votre casque avec le Mac (Réglages Système > Bluetooth) et
+- Jumelez votre appareil avec le Mac (Réglages Système > Bluetooth) et
   connectez-le comme appareil audio.
-- Une seule application à la fois peut piloter le casque : si l'app
+- Une seule application à la fois peut piloter l'appareil : si l'app
   soundcore de votre téléphone est ouverte, fermez-la. L'app se connecte
   toute seule dès que c'est possible.
 
@@ -48,8 +56,8 @@ CRÉDITS
 
 -----------------------------------------------------------------------
 
-SOUNDCORE APP for macOS — version 1.0.0
-Companion app for soundcore headphones.
+SOUNDCORE APP for macOS — version 1.1.0
+Companion app for soundcore headphones and earbuds.
 
 UNOFFICIAL, NON-CERTIFIED APP: not developed, affiliated with, endorsed or
 certified by Anker Innovations or soundcore. Use at your own risk.
@@ -57,15 +65,23 @@ certified by Anker Innovations or soundcore. Use at your own risk.
 
 COMPATIBILITY
 - macOS 11 Big Sur or later, Apple Silicon and Intel Macs.
-- Fully supported headphones: soundcore Q20i (A3004).
-- Other soundcore models are recognised, but their settings are not
-  supported yet (the app says so).
+- About 40 soundcore products are described: headphones (Q20i, Life Q30,
+  Life Q35, Space One, Space Q45…) and earbuds (Liberty, Life Note,
+  Life Dot, Space A40, P20i, P30i, P40i, A20i…). The full list and each
+  one's level of support are in the project README.
+- Other soundcore devices work through the shared commands (battery,
+  firmware, serial number); the app says so.
+- Speakers with a different protocol (Motion+) are not supported.
+- Tested in demo mode; please report what works on your device.
 
 WHAT IT DOES
-- Battery level, with charging indicator.
-- Noise control: noise cancelling, normal, transparency. The app also
-  follows changes made with the headphones' button.
-- Equalizer: the headphones' 22 presets, or your own 8-band curve (±6 dB).
+- Battery: headphones, or left and right earbuds and the case, with
+  charging.
+- Noise control: noise cancelling, normal, transparency, and their
+  flavours where the device offers them. The app follows the device's
+  buttons too.
+- Equalizer: the device's presets, or your own 8-band curve (±6 dB) when
+  it allows one.
 - Details: model, firmware, serial number, Bluetooth address.
 - 5 languages (English, French, Spanish, German, Italian), light and dark.
 
@@ -79,9 +95,9 @@ INSTALL
 4. Allow Bluetooth access when macOS asks.
 
 BEFORE CONNECTING
-- Pair your headphones with the Mac (System Settings > Bluetooth) and
-  connect them as an audio device.
-- Only one app at a time can control the headphones: if the soundcore app
+- Pair your device with the Mac (System Settings > Bluetooth) and
+  connect it as an audio device.
+- Only one app at a time can control the device: if the soundcore app
   is open on your phone, close it. The app connects on its own as soon as
   it can.
 

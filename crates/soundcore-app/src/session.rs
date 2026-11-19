@@ -15,8 +15,8 @@ use std::time::{Duration, Instant};
 use crossbeam_channel::{Receiver, Sender, unbounded};
 use soundcore_bt::{LinkEvent, Service};
 use soundcore_protocol::{
-    AmbientMode, Command, DeviceState, Equalizer, Event, Frame, Reassembler, SoundModes, frame,
-    model, request,
+    AmbientMode, Command, DeviceState, Equalizer, Event, Field, Frame, Kind, NoiseCancelingMode,
+    Reassembler, SoundModes, TransparencyMode, frame, model, request,
 };
 
 const WARM_UP: Duration = Duration::from_secs(2);
@@ -70,6 +70,8 @@ pub struct Snapshot {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Action {
     SetAmbient(AmbientMode),
+    SetNoiseCanceling(NoiseCancelingMode),
+    SetTransparency(TransparencyMode),
     SetEqualizer(Equalizer),
     Refresh,
 }
@@ -274,7 +276,8 @@ impl Engine {
                 }
                 self.close_link();
                 self.log(format!("connect {} ({})", t.name, t.address));
-                self.state = DeviceState::new(model::from_name(&t.name));
+                self.state =
+                    DeviceState::new(model::from_name(&t.name), model::kind_from_name(&t.name));
                 self.target = Some(t);
                 self.backoff = Duration::from_secs(2);
                 self.retry_at = Some(Instant::now());
@@ -299,6 +302,9 @@ impl Engine {
     fn act(&mut self, a: Action) {
         match a {
             Action::SetAmbient(mode) => {
+                if !self.state.can_write_sound_modes() {
+                    return;
+                }
                 let modes = self
                     .state
                     .sound_modes
@@ -307,16 +313,48 @@ impl Engine {
                 self.state.set_sound_modes(modes);
                 self.write(request::sound_modes(&modes));
             }
+            Action::SetNoiseCanceling(nc) => {
+                if !self.state.can_write_sound_modes() {
+                    return;
+                }
+                let modes = self
+                    .state
+                    .sound_modes
+                    .unwrap_or_else(|| SoundModes::new(AmbientMode::NoiseCanceling))
+                    .with_noise_canceling(nc);
+                self.state.set_sound_modes(modes);
+                self.write(request::sound_modes(&modes));
+            }
+            Action::SetTransparency(tm) => {
+                if !self.state.can_write_sound_modes() {
+                    return;
+                }
+                let modes = self
+                    .state
+                    .sound_modes
+                    .unwrap_or_else(|| SoundModes::new(AmbientMode::Transparency))
+                    .with_transparency(tm);
+                self.state.set_sound_modes(modes);
+                self.write(request::sound_modes(&modes));
+            }
             Action::SetEqualizer(eq) => {
+                let Some(spec) = self.state.caps.equalizer else {
+                    return;
+                };
+                if !self.state.caps.equalizer_writable {
+                    return;
+                }
                 self.state.set_equalizer(eq);
                 // Only the latest curve matters while a slider is dragged.
-                self.queue
-                    .retain(|(c, _)| *c != soundcore_protocol::cmd::SET_EQUALIZER_APPLIED);
-                self.write(request::equalizer(&eq));
+                self.queue.retain(|(c, _)| {
+                    *c != soundcore_protocol::cmd::SET_EQUALIZER_APPLIED
+                        && *c != soundcore_protocol::cmd::SET_EQUALIZER
+                });
+                self.write(request::equalizer_for(&eq, &spec));
             }
             Action::Refresh => {
                 if self.phase == Phase::Ready {
-                    self.send(request::state());
+                    self.request_all();
                 } else if self.target.is_some() && !self.demo {
                     self.close_link();
                     self.retry_at = Some(Instant::now());
@@ -353,9 +391,15 @@ impl Engine {
         let Some(t) = self.target.clone() else { return };
         // Exact model from the vendor service UUID when macOS has it cached.
         for s in soundcore_bt::services(&t.address) {
-            if let Some(m) = s.uuids.iter().find_map(model::from_vendor_uuid) {
-                self.state.model = Some(m);
+            for u in s.uuids.iter().filter(|u| soundcore_bt::is_vendor_uuid(u)) {
+                match model::from_vendor_uuid(u) {
+                    Some(m) => self.state.set_model(m),
+                    None => self.state.product = Some(model::product_number(u)),
+                }
             }
+        }
+        if let Some(p) = self.state.product_id() {
+            self.log(format!("product {p}"));
         }
         self.generation += 1;
         let generation = self.generation;
@@ -397,7 +441,7 @@ impl Engine {
                 self.open_deadline = None;
                 self.state_tries = 0;
                 self.set_phase(Phase::Loading);
-                self.request_state();
+                self.request_all();
             }
             LinkEvent::Data(bytes) => {
                 self.log(format!("RX {}", hex(&bytes)));
@@ -430,25 +474,28 @@ impl Engine {
         }
     }
 
-    fn request_state(&mut self) {
+    /// Full state when the product's layout is known, plus the individual requests
+    /// every soundcore product answers.
+    fn request_all(&mut self) {
         self.state_tries += 1;
         self.state_sent = Some(Instant::now());
-        self.send(request::state());
+        if !self.state.caps.layout.is_empty() {
+            self.send(request::state());
+        }
+        self.send(request::battery_levels());
+        self.send(request::charging());
+        self.send(request::info());
     }
 
     fn on_frame(&mut self, f: Frame) {
-        let ev = Event::parse(&f);
+        let ev = Event::parse(&f, self.state.caps.layout);
         match &ev {
             Event::Ack(c) => {
                 if self.inflight.is_some_and(|(i, _)| i == *c) {
                     self.inflight = None;
                 }
             }
-            Event::State(_) => {
-                self.state_sent = None;
-                self.backoff = Duration::from_secs(2);
-                self.set_phase(Phase::Ready);
-            }
+            Event::State(_) => self.state_sent = None,
             Event::Unknown(f) => self.log(format!(
                 "unhandled {:02x}{:02x}",
                 f.command[0], f.command[1]
@@ -457,6 +504,10 @@ impl Engine {
         }
         if self.state.apply(&ev) {
             self.dirty = true;
+        }
+        if self.state.ready && self.phase == Phase::Loading {
+            self.backoff = Duration::from_secs(2);
+            self.set_phase(Phase::Ready);
         }
     }
 
@@ -491,7 +542,7 @@ impl Engine {
             .is_some_and(|s| now.duration_since(s) >= STATE_TIMEOUT)
         {
             if self.state_tries < 3 {
-                self.request_state();
+                self.request_all();
             } else {
                 self.retry_later(Phase::Failed("no state answer".into()));
             }
@@ -517,26 +568,66 @@ impl Engine {
     // demo
     // ---------------------------------------------------------------------------------
 
+    /// Builds a state answer for the demo product from its layout, as the device
+    /// would send it, and runs it through the normal parser.
     fn demo_connect(&mut self) {
         let scene = std::env::var("SOUNDCORE_SCENE").unwrap_or_default();
+        let id = std::env::var("SOUNDCORE_DEMO_MODEL").unwrap_or_else(|_| "A3004".into());
+        let m = model::by_id(&id)
+            .or_else(|| model::by_id("A3004"))
+            .expect("demo model");
         self.target = Some(Target {
-            name: "soundcore Q20i".into(),
+            name: m.name.into(),
             address: "00-00-00-00-00-00".into(),
         });
-        self.state = DeviceState::new(model::by_id("A3004"));
-        let mut body = vec![4, u8::from(scene == "charging")];
-        body.extend_from_slice(b"01.10");
-        body.extend_from_slice(b"3004DEMO00000000");
+        self.state = DeviceState::new(Some(m), m.caps.kind);
+        let charging = u8::from(scene == "charging");
         let eq = if scene == "custom" {
             Equalizer::custom([40, 30, 10, 0, -10, 10, 30, 20])
         } else {
             Equalizer::default()
         };
-        body.extend_from_slice(&eq.bytes());
-        body.extend_from_slice(&SoundModes::new(AmbientMode::NoiseCanceling).bytes());
+        // Raw battery values that read as 80 % (buds) and 60 % (case) on this product.
+        let raw = |sc: soundcore_protocol::BatteryScale, pct: u16| {
+            ((sc.max as u16 * pct / 100) as u8).saturating_sub(sc.offset)
+        };
+        let (bud, case) = (raw(m.caps.battery, 80), raw(m.caps.case, 60));
+        let mut body = Vec::new();
+        for f in m.caps.layout {
+            match *f {
+                Field::SingleBattery => body.extend_from_slice(&[bud, charging]),
+                Field::BatteryLevel => body.push(bud),
+                Field::DualBattery => body.extend_from_slice(&[bud, bud, charging, 0]),
+                Field::DualBatteryLevel => body.extend_from_slice(&[bud, bud]),
+                Field::CaseBattery => body.push(case),
+                Field::Firmware => body.extend_from_slice(b"01.10"),
+                Field::DualFirmware => body.extend_from_slice(b"01.1001.10"),
+                Field::Serial => {
+                    body.extend_from_slice(format!("{}DEMO00000000", &m.id[1..]).as_bytes())
+                }
+                Field::Equalizer { channels, bands } => {
+                    body.extend(eq.bytes_for(channels as usize, bands as usize))
+                }
+                Field::SoundModes => {
+                    body.extend_from_slice(&SoundModes::new(AmbientMode::NoiseCanceling).bytes())
+                }
+                Field::SoundModesV2(n) => {
+                    let mut b = vec![0u8; n as usize];
+                    b[0] = AmbientMode::NoiseCanceling.byte();
+                    body.extend(b);
+                }
+                Field::Skip(n) => body.extend(std::iter::repeat_n(0, n as usize)),
+            }
+        }
         let bytes = frame::encode_from_device(soundcore_protocol::cmd::STATE, &body);
         for f in Reassembler::new().push(&bytes) {
-            self.state.apply(&Event::parse(&f));
+            self.state.apply(&Event::parse(&f, m.caps.layout));
+        }
+        if m.caps.kind == Kind::Earbuds && self.state.batteries.case.is_none() {
+            self.state.batteries.case = Some(soundcore_protocol::Level {
+                level: case,
+                charging: false,
+            });
         }
         match scene.as_str() {
             "waiting" => self.phase = Phase::Waiting,

@@ -68,16 +68,29 @@ fn print_status(s: &SessionHandle) {
     if let Some(t) = &snap.target {
         println!("device     {} ({})", t.name, t.address);
     }
-    if let Some(m) = st.model {
-        println!("model      {} {}", m.id, m.name);
+    match (st.model, st.product_id()) {
+        (Some(m), _) => println!("model      {} {}", m.id, m.name),
+        (None, Some(p)) => println!("model      {p} (not described yet: common commands)"),
+        _ => {}
     }
-    if let Some(b) = st.battery {
-        println!(
-            "battery    {} %{}",
-            b.percent(),
-            if b.charging { " (charging)" } else { "" }
-        );
-    }
+    let show = |label: &str, l: Option<soundcore_protocol::Level>| {
+        if let Some(l) = l {
+            let scale = if label == "case" {
+                st.caps.case
+            } else {
+                st.caps.battery
+            };
+            let pct = scale.percent(l.level);
+            println!(
+                "{label:<11}{pct} %{}",
+                if l.charging { " (charging)" } else { "" }
+            );
+        }
+    };
+    show("battery", st.batteries.single);
+    show("left", st.batteries.left);
+    show("right", st.batteries.right);
+    show("case", st.batteries.case);
     if let Some(m) = st.sound_modes {
         println!("mode       {:?}", m.ambient);
     }
@@ -176,7 +189,7 @@ fn run(args: Vec<String>) {
                 let line = format!(
                     "{:?} {:?} {:?}",
                     snap.phase,
-                    snap.state.battery,
+                    snap.state.batteries,
                     snap.state.sound_modes.map(|m| m.ambient)
                 );
                 if line != last {

@@ -3,7 +3,9 @@
 use egui::{
     Align2, CornerRadius, Id, Painter, Rect, Sense, Shape, Stroke, StrokeKind, Ui, pos2, vec2,
 };
-use soundcore_protocol::{AmbientMode, Equalizer, eq, types};
+use soundcore_protocol::{
+    AmbientMode, Equalizer, NoiseCancelingMode, PresetRules, TransparencyMode, eq, types,
+};
 
 use super::app::{Modal, SoundcoreApp, ThemePref, open_bluetooth_settings, open_url, pill};
 use super::art;
@@ -39,12 +41,41 @@ fn mode_icon(p: &Painter, m: AmbientMode, c: egui::Pos2, size: f32, color: egui:
     }
 }
 
-/// Name of the equalizer setting currently on the headphones.
-fn eq_name(e: &Equalizer) -> &'static str {
+fn nc_label(m: NoiseCancelingMode) -> &'static str {
+    match m {
+        NoiseCancelingMode::Transport => t(T::NcTransport),
+        NoiseCancelingMode::Outdoor => t(T::NcOutdoor),
+        NoiseCancelingMode::Indoor => t(T::NcIndoor),
+        NoiseCancelingMode::Custom => t(T::NcCustom),
+    }
+}
+
+fn transparency_label(m: TransparencyMode) -> &'static str {
+    match m {
+        TransparencyMode::FullyTransparent => t(T::TransparencyFull),
+        TransparencyMode::Vocal => t(T::TransparencyVocal),
+    }
+}
+
+fn battery_color(pct: u8, charging: bool) -> egui::Color32 {
+    let pl = pal();
+    if charging {
+        pl.good
+    } else if pct <= 20 {
+        pl.warn
+    } else {
+        pl.text
+    }
+}
+
+/// Name of the equalizer setting currently on the device.
+fn eq_name(e: &Equalizer, rules: &PresetRules) -> &'static str {
     if e.is_custom() {
         return t(T::Custom);
     }
-    eq::by_id(e.preset)
+    rules
+        .find(e.preset)
+        .or_else(|| eq::by_id(e.preset).copied())
         .map(|p| preset_name(p.key))
         .unwrap_or(t(T::Custom))
 }
@@ -212,51 +243,48 @@ impl SoundcoreApp {
     ) -> f32 {
         let pl = pal();
         let st = &snap.state;
+        let caps = st.caps;
         let ready = snap.phase == Phase::Ready;
         let mut y = self.status_card(ui, p, x0, cw, top, snap, now);
 
-        // Model this version recognises but cannot drive.
-        if st.model.is_some_and(|m| m.caps.is_none()) {
-            let body_h = paragraph_height(
-                p,
-                cw - 2.0 * PAD - 40.0,
-                t(T::UnsupportedBody),
-                theme::regular(13.0),
-            );
+        // Products the table does not describe run on the common commands.
+        if ready && !st.described() {
+            let body_w = cw - 2.0 * PAD - 40.0;
+            let body_h = paragraph_height(p, body_w, t(T::NotDescribedBody), theme::regular(13.0));
             let r = Rect::from_min_size(pos2(x0, y), vec2(cw, body_h + 60.0));
-            p.rect_filled(r, CornerRadius::same(22), pl.warn.gamma_multiply(0.14));
-            art::warning(
+            p.rect_filled(r, CornerRadius::same(22), pl.accent_soft);
+            art::info(
                 p,
                 pos2(r.left() + PAD + 10.0, r.top() + 30.0),
                 20.0,
-                pl.warn,
+                pl.accent,
             );
             fit_text(
                 p,
                 pos2(r.left() + PAD + 34.0, r.top() + 30.0),
                 Align2::LEFT_CENTER,
-                t(T::UnsupportedTitle),
+                t(T::NotDescribedTitle),
                 theme::semibold(15.0),
-                cw - 2.0 * PAD - 40.0,
+                body_w,
                 pl.text,
             );
             paragraph(
                 p,
                 pos2(r.left() + PAD + 34.0, r.top() + 46.0),
-                cw - 2.0 * PAD - 40.0,
-                t(T::UnsupportedBody),
+                body_w,
+                t(T::NotDescribedBody),
                 theme::regular(13.0),
                 pl.text_dim,
             );
             y = r.bottom() + GAP;
         }
 
-        // Hero: illustration, name, battery.
+        // Hero: illustration, name, batteries.
         let hero = Rect::from_min_size(pos2(x0, y), vec2(cw, 236.0));
         card(p, hero);
         let art_r = Rect::from_min_size(hero.left_top() + vec2(24.0, 18.0), vec2(200.0, 200.0));
         p.circle_filled(art_r.center(), 92.0, pl.accent_soft);
-        art::headphones(p, art_r.shrink(14.0), pl.accent);
+        art::product(p, caps.kind, art_r.shrink(14.0), pl.accent);
         let tx = art_r.right() + 24.0;
         let tw = hero.right() - PAD - tx;
         let name = snap
@@ -273,7 +301,7 @@ impl SoundcoreApp {
             tw,
             pl.text,
         );
-        let mut sub = st.model.map(|m| m.id.to_string()).unwrap_or_default();
+        let mut sub = st.product_id().unwrap_or_default();
         if let Some(fw) = &st.firmware {
             if !sub.is_empty() {
                 sub.push_str(" · ");
@@ -289,7 +317,6 @@ impl SoundcoreApp {
             tw,
             pl.text_dim,
         );
-        // Battery.
         let by = hero.top() + 136.0;
         fit_text(
             p,
@@ -300,65 +327,108 @@ impl SoundcoreApp {
             tw,
             pl.text_faint,
         );
-        match st.battery {
-            Some(b) if ready => {
-                let pct = b.percent();
-                let color = if b.charging {
-                    pl.good
-                } else if pct <= 20 {
-                    pl.warn
-                } else {
-                    pl.text
-                };
-                art::battery(
-                    p,
-                    Rect::from_min_size(pos2(tx, by - 9.0), vec2(40.0, 19.0)),
-                    pct as f32 / 100.0,
-                    color,
-                    b.charging,
-                );
-                let r = fit_text(
-                    p,
-                    pos2(tx + 52.0, by),
-                    Align2::LEFT_CENTER,
-                    &format!("{pct} %"),
-                    theme::semibold(22.0),
-                    90.0,
-                    pl.text,
-                );
-                if b.charging {
-                    pill(
-                        p,
-                        pos2(r.right() + 12.0, by - 12.0),
-                        t(T::Charging),
-                        pl.good,
-                        pl.good.gamma_multiply(0.14),
-                    );
-                }
-            }
-            _ => {
+        let b = st.batteries;
+        if !ready || b.is_empty() {
+            fit_text(
+                p,
+                pos2(tx, by),
+                Align2::LEFT_CENTER,
+                "—",
+                theme::semibold(22.0),
+                60.0,
+                pl.text_faint,
+            );
+        } else if b.is_dual() {
+            let parts = [
+                (t(T::Left), b.left, caps.battery),
+                (t(T::Right), b.right, caps.battery),
+                (t(T::Case), b.case, caps.case),
+            ];
+            let col = (tw / 3.0).min(130.0);
+            for (i, (label, level, scale)) in parts.iter().enumerate() {
+                let x = tx + i as f32 * col;
                 fit_text(
                     p,
-                    pos2(tx, by),
+                    pos2(x, by - 2.0),
                     Align2::LEFT_CENTER,
-                    "—",
-                    theme::semibold(22.0),
-                    60.0,
-                    pl.text_faint,
+                    label,
+                    theme::medium(12.0),
+                    col - 8.0,
+                    pl.text_dim,
+                );
+                match level {
+                    Some(l) => {
+                        let pct = scale.percent(l.level);
+                        let color = battery_color(pct, l.charging);
+                        art::battery(
+                            p,
+                            Rect::from_min_size(pos2(x, by + 14.0), vec2(30.0, 15.0)),
+                            pct as f32 / 100.0,
+                            color,
+                            l.charging,
+                        );
+                        fit_text(
+                            p,
+                            pos2(x + 38.0, by + 21.5),
+                            Align2::LEFT_CENTER,
+                            &format!("{pct} %"),
+                            theme::semibold(16.0),
+                            col - 46.0,
+                            pl.text,
+                        );
+                    }
+                    None => {
+                        fit_text(
+                            p,
+                            pos2(x, by + 21.5),
+                            Align2::LEFT_CENTER,
+                            "—",
+                            theme::semibold(16.0),
+                            40.0,
+                            pl.text_faint,
+                        );
+                    }
+                }
+            }
+        } else if let Some(l) = b.single {
+            let pct = caps.battery.percent(l.level);
+            let color = battery_color(pct, l.charging);
+            art::battery(
+                p,
+                Rect::from_min_size(pos2(tx, by - 9.0), vec2(40.0, 19.0)),
+                pct as f32 / 100.0,
+                color,
+                l.charging,
+            );
+            let r = fit_text(
+                p,
+                pos2(tx + 52.0, by),
+                Align2::LEFT_CENTER,
+                &format!("{pct} %"),
+                theme::semibold(22.0),
+                90.0,
+                pl.text,
+            );
+            if l.charging {
+                pill(
+                    p,
+                    pos2(r.right() + 12.0, by - 12.0),
+                    t(T::Charging),
+                    pl.good,
+                    pl.good.gamma_multiply(0.14),
                 );
             }
         }
-        // Connection status.
         let (label, color) = if ready {
             (t(T::Connected), pl.good)
         } else {
             (t(T::NotConnected), pl.text_faint)
         };
-        let sr = Rect::from_min_size(pos2(tx, hero.bottom() - 54.0), vec2(0.0, 26.0));
-        p.circle_filled(pos2(sr.left() + 5.0, sr.center().y), 4.5, color);
+        let sy = hero.bottom() - 41.0;
+        p.circle_filled(pos2(tx + 5.0, sy), 4.5, color);
         fit_text(
             p,
-            pos2(sr.left() + 16.0, sr.center().y),
+            pos2(tx + 16.0, sy),
             Align2::LEFT_CENTER,
             label,
             theme::medium(13.0),
@@ -368,15 +438,154 @@ impl SoundcoreApp {
         y = hero.bottom() + GAP;
 
         // Noise control.
+        if !caps.ambient_modes.is_empty() {
+            y = self.noise_card(ui, p, x0, cw, y, snap) + GAP;
+        }
+
+        // Equalizer summary, and tips for products whose manual we follow.
+        let tips: &[T] = if st.model.is_some_and(|m| m.id == "A3004") {
+            &[T::TipModeButton, T::TipVoiceAssistant, T::TipLed]
+        } else {
+            &[]
+        };
+        let has_eq = caps.equalizer.is_some();
+        if !has_eq && tips.is_empty() {
+            return y - GAP;
+        }
+        let two = has_eq && !tips.is_empty() && cw >= 620.0;
+        let half = if two { (cw - GAP) / 2.0 } else { cw };
+        let tip_w = half - 2.0 * PAD - 18.0;
+        let tips_h: f32 = tips
+            .iter()
+            .map(|s| paragraph_height(p, tip_w, t(*s), theme::regular(13.0)) + 12.0)
+            .sum();
+        let tips_card_h = 66.0 + tips_h + PAD - 12.0;
+        let eq_h: f32 = 210.0;
+        let row_h = if two { eq_h.max(tips_card_h) } else { eq_h };
+        let mut bottom = y;
+        if has_eq {
+            let eq_r = Rect::from_min_size(pos2(x0, y), vec2(half, row_h));
+            card(p, eq_r);
+            let resp = widgets::hit(ui, eq_r, "eq-card", true);
+            widgets::section_title(
+                p,
+                eq_r.left_top() + vec2(PAD, PAD),
+                t(T::TabEqualizer),
+                half - 2.0 * PAD - 30.0,
+            );
+            art::chevron_right(
+                p,
+                pos2(eq_r.right() - PAD - 4.0, eq_r.top() + PAD + 11.0),
+                12.0,
+                pl.text_dim,
+            );
+            let e = st.equalizer.unwrap_or_default();
+            fit_text(
+                p,
+                eq_r.left_top() + vec2(PAD, PAD + 30.0),
+                Align2::LEFT_TOP,
+                eq_name(&e, &caps.presets),
+                theme::medium(14.0),
+                half - 2.0 * PAD,
+                pl.accent,
+            );
+            let graph = Rect::from_min_max(
+                eq_r.left_top() + vec2(PAD, PAD + 66.0),
+                eq_r.right_bottom() - vec2(PAD, PAD),
+            );
+            p.hline(
+                graph.left()..=graph.right(),
+                graph.center().y,
+                Stroke::new(1.0, pl.stroke),
+            );
+            draw_curve(p, graph, &e.gains(), true);
+            if resp.clicked() {
+                self.tab = super::app::Tab::Equalizer;
+            }
+            bottom = eq_r.bottom();
+        }
+        if !tips.is_empty() {
+            let (tx0, ty0) = if two || !has_eq {
+                (if two { x0 + half + GAP } else { x0 }, y)
+            } else {
+                (x0, bottom + GAP)
+            };
+            let tips_r = Rect::from_min_size(
+                pos2(tx0, ty0),
+                vec2(half, if two { row_h } else { tips_card_h }),
+            );
+            card(p, tips_r);
+            widgets::section_title(
+                p,
+                tips_r.left_top() + vec2(PAD, PAD),
+                t(T::OnYourHeadphones),
+                half - 2.0 * PAD,
+            );
+            let mut ty = tips_r.top() + 66.0;
+            for tip in tips {
+                p.circle_filled(pos2(tips_r.left() + PAD + 4.0, ty + 10.0), 3.0, pl.accent);
+                ty += paragraph(
+                    p,
+                    pos2(tips_r.left() + PAD + 18.0, ty),
+                    tip_w,
+                    t(*tip),
+                    theme::regular(13.0),
+                    pl.text_dim,
+                ) + 12.0;
+            }
+            bottom = bottom.max(tips_r.bottom());
+        }
+        bottom
+    }
+
+    /// Mode tiles, flavour choice and description. Returns the card's bottom.
+    fn noise_card(
+        &mut self,
+        ui: &Ui,
+        p: &Painter,
+        x0: f32,
+        cw: f32,
+        y: f32,
+        snap: &Snapshot,
+    ) -> f32 {
+        let pl = pal();
+        let st = &snap.state;
+        let caps = st.caps;
+        let ready = snap.phase == Phase::Ready;
         let current = st.sound_modes.map(|m| m.ambient);
-        let modes = st
-            .model
-            .and_then(|m| m.caps)
-            .map(|c| c.ambient_modes.to_vec())
-            .unwrap_or_else(|| AmbientMode::ALL.to_vec());
+        // Flavour row under the tiles, when the product offers one for the current mode.
+        let flavours: Vec<(&'static str, bool, Action)> = match (current, st.sound_modes) {
+            (Some(AmbientMode::NoiseCanceling), Some(m)) => caps
+                .noise_canceling_modes
+                .iter()
+                .map(|f| {
+                    (
+                        nc_label(*f),
+                        m.noise_canceling_mode() == Some(*f),
+                        Action::SetNoiseCanceling(*f),
+                    )
+                })
+                .collect(),
+            (Some(AmbientMode::Transparency), Some(m)) => caps
+                .transparency_modes
+                .iter()
+                .map(|f| {
+                    (
+                        transparency_label(*f),
+                        m.transparency_mode() == Some(*f),
+                        Action::SetTransparency(*f),
+                    )
+                })
+                .collect(),
+            _ => Vec::new(),
+        };
         let desc = current.map(mode_desc).unwrap_or("");
         let desc_h = paragraph_height(p, cw - 2.0 * PAD, desc, theme::regular(13.5));
-        let nc = Rect::from_min_size(pos2(x0, y), vec2(cw, 66.0 + 128.0 + 16.0 + desc_h + PAD));
+        let flavour_h = if flavours.is_empty() { 0.0 } else { 58.0 };
+        let nc = Rect::from_min_size(
+            pos2(x0, y),
+            vec2(cw, 66.0 + 128.0 + 16.0 + flavour_h + desc_h + PAD),
+        );
         card(p, nc);
         widgets::section_title(
             p,
@@ -384,6 +593,7 @@ impl SoundcoreApp {
             t(T::NoiseControl),
             cw - 2.0 * PAD,
         );
+        let modes = caps.ambient_modes;
         let n = modes.len() as f32;
         let tile_w = (cw - 2.0 * PAD - (n - 1.0) * 14.0) / n;
         for (i, m) in modes.iter().enumerate() {
@@ -432,97 +642,28 @@ impl SoundcoreApp {
                 self.act(Action::SetAmbient(*m));
             }
         }
+        let mut dy = nc.top() + 66.0 + 128.0 + 16.0;
+        if !flavours.is_empty() {
+            let labels: Vec<&str> = flavours.iter().map(|f| f.0).collect();
+            let selected = flavours.iter().position(|f| f.1).unwrap_or(usize::MAX);
+            let r = Rect::from_min_size(pos2(nc.left() + PAD, dy), vec2(cw - 2.0 * PAD, 42.0));
+            if let Some(i) = widgets::segmented(ui, p, r, &labels, selected, "flavour")
+                && ready
+                && i != selected
+            {
+                self.act(flavours[i].2.clone());
+            }
+            dy += flavour_h;
+        }
         paragraph(
             p,
-            pos2(nc.left() + PAD, nc.top() + 66.0 + 128.0 + 16.0),
+            pos2(nc.left() + PAD, dy),
             cw - 2.0 * PAD,
             desc,
             theme::regular(13.5),
             pl.text_dim,
         );
-        y = nc.bottom() + GAP;
-
-        // Equalizer summary + tips on the headphones.
-        let two = cw >= 620.0;
-        let half = if two { (cw - GAP) / 2.0 } else { cw };
-        let tips = [t(T::TipModeButton), t(T::TipVoiceAssistant), t(T::TipLed)];
-        let tip_w = half - 2.0 * PAD - 18.0;
-        let tips_h: f32 = tips
-            .iter()
-            .map(|s| paragraph_height(p, tip_w, s, theme::regular(13.0)) + 12.0)
-            .sum();
-        let eq_h: f32 = 210.0;
-        let tips_card_h = 66.0 + tips_h + PAD - 12.0;
-        let row_h = if two { eq_h.max(tips_card_h) } else { eq_h };
-
-        let eq_r = Rect::from_min_size(pos2(x0, y), vec2(half, row_h));
-        card(p, eq_r);
-        let resp = widgets::hit(ui, eq_r, "eq-card", true);
-        widgets::section_title(
-            p,
-            eq_r.left_top() + vec2(PAD, PAD),
-            t(T::TabEqualizer),
-            half - 2.0 * PAD - 30.0,
-        );
-        art::chevron_right(
-            p,
-            pos2(eq_r.right() - PAD - 4.0, eq_r.top() + PAD + 11.0),
-            12.0,
-            pl.text_dim,
-        );
-        let e = st.equalizer.unwrap_or_default();
-        fit_text(
-            p,
-            eq_r.left_top() + vec2(PAD, PAD + 30.0),
-            Align2::LEFT_TOP,
-            eq_name(&e),
-            theme::medium(14.0),
-            half - 2.0 * PAD,
-            pl.accent,
-        );
-        let graph = Rect::from_min_max(
-            eq_r.left_top() + vec2(PAD, PAD + 66.0),
-            eq_r.right_bottom() - vec2(PAD, PAD),
-        );
-        p.hline(
-            graph.left()..=graph.right(),
-            graph.center().y,
-            Stroke::new(1.0, pl.stroke),
-        );
-        draw_curve(p, graph, &e.gains(), true);
-        if resp.clicked() {
-            self.tab = super::app::Tab::Equalizer;
-        }
-
-        let (tx0, ty0) = if two {
-            (x0 + half + GAP, y)
-        } else {
-            (x0, eq_r.bottom() + GAP)
-        };
-        let tips_r = Rect::from_min_size(
-            pos2(tx0, ty0),
-            vec2(half, if two { row_h } else { tips_card_h }),
-        );
-        card(p, tips_r);
-        widgets::section_title(
-            p,
-            tips_r.left_top() + vec2(PAD, PAD),
-            t(T::OnYourHeadphones),
-            half - 2.0 * PAD,
-        );
-        let mut ty = tips_r.top() + 66.0;
-        for tip in tips {
-            p.circle_filled(pos2(tips_r.left() + PAD + 4.0, ty + 10.0), 3.0, pl.accent);
-            ty += paragraph(
-                p,
-                pos2(tips_r.left() + PAD + 18.0, ty),
-                tip_w,
-                tip,
-                theme::regular(13.0),
-                pl.text_dim,
-            ) + 12.0;
-        }
-        tips_r.bottom()
+        nc.bottom()
     }
 
     // ---------------------------------------------------------------------------------
@@ -544,6 +685,30 @@ impl SoundcoreApp {
         let ready = snap.phase == Phase::Ready;
         let mut y = self.status_card(ui, p, x0, cw, top, snap, now);
         let current = snap.state.equalizer.unwrap_or_default();
+        if snap.state.caps.equalizer.is_none() {
+            let r = Rect::from_min_size(pos2(x0, y), vec2(cw, 110.0));
+            card(p, r);
+            widgets::section_title(
+                p,
+                r.left_top() + vec2(PAD, PAD),
+                t(T::EqTitleNone),
+                cw - 2.0 * PAD,
+            );
+            paragraph(
+                p,
+                r.left_top() + vec2(PAD, PAD + 32.0),
+                cw - 2.0 * PAD,
+                t(T::EqNone),
+                theme::regular(13.5),
+                pl.text_dim,
+            );
+            return r.bottom();
+        }
+
+        let rules = snap.state.caps.presets;
+        // Editing needs a write format this version speaks, and a custom slot.
+        let writable = ready && snap.state.caps.equalizer_writable;
+        let editable = writable && rules.custom;
 
         // Curve editor first: it is what people come for.
         let editor = Rect::from_min_size(pos2(x0, y), vec2(cw, 400.0));
@@ -558,18 +723,18 @@ impl SoundcoreApp {
             p,
             editor.left_top() + vec2(PAD, PAD + 28.0),
             Align2::LEFT_TOP,
-            eq_name(&current),
+            eq_name(&current, &rules),
             theme::medium(14.0),
             cw - 2.0 * PAD - 150.0,
             pl.accent,
         );
-        if current.is_custom() || self.eq_draft.is_some() {
+        if editable && (current.is_custom() || self.eq_draft.is_some()) {
             let rw = widgets::button_width(p, t(T::Reset), 14.0);
             let rr = Rect::from_min_size(
                 pos2(editor.right() - PAD - rw, editor.top() + PAD),
                 vec2(rw, 36.0),
             );
-            if widgets::button(ui, p, rr, t(T::Reset), ButtonKind::Secondary, ready) {
+            if widgets::button(ui, p, rr, t(T::Reset), ButtonKind::Secondary, editable) {
                 self.custom_eq = [0; 8];
                 self.eq_draft = None;
                 self.act(Action::SetEqualizer(Equalizer::custom([0; 8])));
@@ -615,13 +780,13 @@ impl SoundcoreApp {
             let resp = ui.interact(
                 column,
                 Id::unique(("eq-band", i)),
-                if ready {
+                if editable {
                     Sense::click_and_drag()
                 } else {
                     Sense::hover()
                 },
             );
-            if ready && resp.hovered() {
+            if editable && resp.hovered() {
                 ui.ctx().set_cursor_icon(egui::CursorIcon::ResizeVertical);
             }
             let active = resp.dragged() || self.eq_drag == Some(i);
@@ -641,12 +806,16 @@ impl SoundcoreApp {
                 self.eq_drag = None;
                 changed = true;
             }
-            p.circle_filled(pos2(x, gy), if active { 10.0 } else { 8.0 }, pl.surface);
-            p.circle_stroke(
-                pos2(x, gy),
-                if active { 10.0 } else { 8.0 },
-                Stroke::new(2.4, pl.accent),
-            );
+            if editable {
+                p.circle_filled(pos2(x, gy), if active { 10.0 } else { 8.0 }, pl.surface);
+                p.circle_stroke(
+                    pos2(x, gy),
+                    if active { 10.0 } else { 8.0 },
+                    Stroke::new(2.4, pl.accent),
+                );
+            } else {
+                p.circle_filled(pos2(x, gy), 4.5, pl.accent);
+            }
             if active || resp.hovered() {
                 let db = gains[i] as f32 / 10.0;
                 let label = if db > 0.0 {
@@ -678,7 +847,7 @@ impl SoundcoreApp {
                 pl.text_faint,
             );
         }
-        if changed && ready {
+        if changed && editable {
             self.eq_draft = Some(new_gains);
             self.custom_eq = new_gains;
             // Send while dragging (throttled) and once released.
@@ -698,18 +867,27 @@ impl SoundcoreApp {
             p,
             pos2(editor.left() + PAD, editor.bottom() - PAD - 22.0),
             cw - 2.0 * PAD,
-            t(T::CustomHint),
+            if editable {
+                t(T::CustomHint)
+            } else if writable {
+                t(T::EqPresetsOnly)
+            } else {
+                t(T::EqReadOnly)
+            },
             theme::regular(12.5),
             pl.text_faint,
         );
         y = editor.bottom() + GAP;
 
         // Presets.
-        let mut items: Vec<(String, Option<u16>)> = eq::PRESETS
+        let presets = rules.list();
+        let mut items: Vec<(String, Option<u16>)> = presets
             .iter()
             .map(|p| (preset_name(p.key).to_string(), Some(p.id)))
             .collect();
-        items.push((t(T::Custom).to_string(), None));
+        if rules.custom {
+            items.push((t(T::Custom).to_string(), None));
+        }
         let inner_w = cw - 2.0 * PAD;
         // Flow layout.
         let mut rows: Vec<Vec<(usize, f32)>> = vec![Vec::new()];
@@ -756,10 +934,15 @@ impl SoundcoreApp {
                     None => current.is_custom(),
                 };
                 let r = Rect::from_min_size(pos2(cx, cy), vec2(w, 36.0));
-                if widgets::chip(ui, p, r, label, selected, ("preset", i)) && ready && !selected {
+                if widgets::chip(ui, p, r, label, selected, ("preset", i)) && writable && !selected
+                {
                     self.eq_draft = None;
                     let e = match id {
-                        Some(id) => Equalizer::preset(*id).unwrap_or_default(),
+                        Some(id) => presets
+                            .iter()
+                            .find(|p| p.id == *id)
+                            .map(Equalizer::from_preset)
+                            .unwrap_or_default(),
                         None => Equalizer::custom(self.custom_eq),
                     };
                     self.act(Action::SetEqualizer(e));
@@ -800,7 +983,9 @@ impl SoundcoreApp {
             ),
             (
                 t(T::Model),
-                st.model.map(|m| format!("{} ({})", m.name, m.id)),
+                st.model
+                    .map(|m| format!("{} ({})", m.name, m.id))
+                    .or_else(|| st.product_id()),
             ),
             (t(T::Firmware), st.firmware.clone()),
             (t(T::Serial), st.serial.clone()),

@@ -47,6 +47,59 @@ pub fn by_id(id: u16) -> Option<&'static Preset> {
     PRESETS.iter().find(|p| p.id == id)
 }
 
+/// How a product's preset list differs from the common one.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PresetRules {
+    /// Later products use a brighter Rock curve.
+    pub rock_v2: bool,
+    /// Id the product uses for Bass Booster (0x7e7e on some), `None` when absent.
+    pub bass_booster_id: Option<u16>,
+    /// Restricts the list to these common ids (empty: all of them).
+    pub only: &'static [u16],
+    /// Whether a custom curve can be stored.
+    pub custom: bool,
+}
+
+impl PresetRules {
+    pub const COMMON: PresetRules = PresetRules {
+        rock_v2: false,
+        bass_booster_id: Some(0x02),
+        only: &[],
+        custom: true,
+    };
+    pub const V2: PresetRules = PresetRules {
+        rock_v2: true,
+        ..Self::COMMON
+    };
+    pub const V2_ALT_BASS: PresetRules = PresetRules {
+        bass_booster_id: Some(0x7e7e),
+        ..Self::V2
+    };
+
+    /// Presets offered for this product, with the id to send and the gains.
+    pub fn list(&self) -> Vec<Preset> {
+        PRESETS
+            .iter()
+            .filter(|p| self.only.is_empty() || self.only.contains(&p.id))
+            .filter_map(|p| {
+                let mut p = *p;
+                if p.key == "bass_booster" {
+                    p.id = self.bass_booster_id?;
+                }
+                if p.key == "rock" && self.rock_v2 {
+                    p.gains = [30, 20, -10, -10, 10, 30, 40, 50];
+                }
+                Some(p)
+            })
+            .collect()
+    }
+
+    /// The preset a device reports by id.
+    pub fn find(&self, id: u16) -> Option<Preset> {
+        self.list().into_iter().find(|p| p.id == id)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -59,5 +112,19 @@ mod tests {
         }
         assert_eq!(by_id(0x11).unwrap().key, "rock");
         assert!(by_id(0xfefe).is_none());
+    }
+
+    #[test]
+    fn preset_rules() {
+        assert_eq!(PresetRules::COMMON.list().len(), 22);
+        let v2 = PresetRules::V2_ALT_BASS;
+        assert_eq!(v2.find(0x7e7e).unwrap().key, "bass_booster");
+        assert!(v2.find(0x02).is_none());
+        assert_eq!(v2.find(0x11).unwrap().gains[7], 50);
+        let few = PresetRules {
+            only: &[0, 4],
+            ..PresetRules::COMMON
+        };
+        assert_eq!(few.list().len(), 2);
     }
 }

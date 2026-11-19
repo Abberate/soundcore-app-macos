@@ -843,13 +843,11 @@ impl eframe::App for SoundcoreApp {
         match self.modal {
             Modal::None => {}
             Modal::Devices => {
-                let fg_ui =
-                    ui.new_child(UiBuilder::new().layer_id(fg.layer_id()).max_rect(screen));
+                let fg_ui = ui.new_child(UiBuilder::new().layer_id(fg.layer_id()).max_rect(screen));
                 self.modal_devices(&fg_ui, &fg, screen, &snap, now);
             }
             Modal::Language => {
-                let fg_ui =
-                    ui.new_child(UiBuilder::new().layer_id(fg.layer_id()).max_rect(screen));
+                let fg_ui = ui.new_child(UiBuilder::new().layer_id(fg.layer_id()).max_rect(screen));
                 self.modal_language(&fg_ui, &fg, screen);
             }
             Modal::Log => {
