@@ -1,0 +1,29 @@
+[package]
+name = "soundcore-app"
+description = "Soundcore App — unofficial macOS companion for soundcore headphones"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+default-run = "soundcore-app"
+
+[[bin]]
+name = "soundcore-app"
+path = "src/main.rs"
+
+[[bin]]
+name = "soundcorectl"
+path = "src/bin/soundcorectl.rs"
+
+[dependencies]
+soundcore-protocol.workspace = true
+soundcore-bt.workspace = true
+eframe = { version = "0.37", default-features = false, features = ["glow", "default_fonts", "persistence"] }
+egui = "0.37"
+image = { version = "0.25", default-features = false, features = ["png"] }
+env_logger = { version = "0.11", default-features = false, features = ["auto-color", "humantime"] }
+log = "0.4"
+crossbeam-channel = "0.5"
+serde = { version = "1", features = ["derive"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2-foundation = { workspace = true, features = ["NSLocale", "NSArray", "NSString"] }

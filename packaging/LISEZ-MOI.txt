@@ -1,0 +1,92 @@
+SOUNDCORE APP pour macOS — version 1.0.0
+Application compagnon pour casques soundcore.
+
+APPLICATION NON OFFICIELLE ET NON HOMOLOGUÉE : elle n'est ni développée, ni
+affiliée, ni approuvée, ni certifiée par Anker Innovations ou soundcore.
+Utilisation à vos risques. « soundcore » et « Anker » sont des marques
+d'Anker Innovations.
+
+COMPATIBILITÉ
+- macOS 11 Big Sur ou plus récent, Mac Apple Silicon et Intel.
+- Casque entièrement pris en charge : soundcore Q20i (A3004).
+- Les autres modèles soundcore sont reconnus, mais leurs réglages ne sont
+  pas encore pris en charge (un message l'indique dans l'app).
+
+CE QUE FAIT L'APP
+- Batterie du casque, avec l'indication de charge.
+- Contrôle du bruit : réduction de bruit, normal, transparence. L'app suit
+  aussi les changements faits avec le bouton du casque.
+- Égaliseur : les 22 préréglages du casque, ou votre propre courbe sur
+  8 bandes (±6 dB).
+- Informations : modèle, firmware, numéro de série, adresse Bluetooth.
+- 5 langues (français, anglais, espagnol, allemand, italien), mode clair
+  et sombre.
+
+INSTALLATION
+1. Glissez « Soundcore App » sur le dossier « Applications ».
+2. Ouvrez l'app depuis le Launchpad ou le dossier Applications.
+3. Au premier lancement, macOS peut bloquer l'app (elle n'est pas signée
+   par un développeur Apple identifié). Dans ce cas :
+   Réglages Système > Confidentialité et sécurité > tout en bas,
+   cliquez « Ouvrir quand même », puis confirmez.
+   (Sur macOS 14 ou plus ancien : clic droit sur l'app > Ouvrir.)
+4. Autorisez l'accès Bluetooth quand macOS le demande.
+
+AVANT DE VOUS CONNECTER
+- Jumelez votre casque avec le Mac (Réglages Système > Bluetooth) et
+  connectez-le comme appareil audio.
+- Une seule application à la fois peut piloter le casque : si l'app
+  soundcore de votre téléphone est ouverte, fermez-la. L'app se connecte
+  toute seule dès que c'est possible.
+
+CRÉDITS
+- Le protocole des casques soundcore a été documenté par le projet
+  OpenSCQ30 (Oppzippy) : https://github.com/Oppzippy/OpenSCQ30
+  Merci !
+- Police Poppins (SIL Open Font License 1.1).
+- Licence : GPL-3.0-or-later.
+
+-----------------------------------------------------------------------
+
+SOUNDCORE APP for macOS — version 1.0.0
+Companion app for soundcore headphones.
+
+UNOFFICIAL, NON-CERTIFIED APP: not developed, affiliated with, endorsed or
+certified by Anker Innovations or soundcore. Use at your own risk.
+"soundcore" and "Anker" are trademarks of Anker Innovations.
+
+COMPATIBILITY
+- macOS 11 Big Sur or later, Apple Silicon and Intel Macs.
+- Fully supported headphones: soundcore Q20i (A3004).
+- Other soundcore models are recognised, but their settings are not
+  supported yet (the app says so).
+
+WHAT IT DOES
+- Battery level, with charging indicator.
+- Noise control: noise cancelling, normal, transparency. The app also
+  follows changes made with the headphones' button.
+- Equalizer: the headphones' 22 presets, or your own 8-band curve (±6 dB).
+- Details: model, firmware, serial number, Bluetooth address.
+- 5 languages (English, French, Spanish, German, Italian), light and dark.
+
+INSTALL
+1. Drag "Soundcore App" onto the "Applications" folder.
+2. Open the app from Launchpad or the Applications folder.
+3. On first launch macOS may block the app (it is not signed by an
+   identified Apple developer). If so: System Settings > Privacy &
+   Security > scroll down, click "Open Anyway", then confirm.
+   (macOS 14 or earlier: right-click the app > Open.)
+4. Allow Bluetooth access when macOS asks.
+
+BEFORE CONNECTING
+- Pair your headphones with the Mac (System Settings > Bluetooth) and
+  connect them as an audio device.
+- Only one app at a time can control the headphones: if the soundcore app
+  is open on your phone, close it. The app connects on its own as soon as
+  it can.
+
+CREDITS
+- The soundcore headphones protocol was documented by the OpenSCQ30
+  project (Oppzippy): https://github.com/Oppzippy/OpenSCQ30  Thank you!
+- Poppins typeface (SIL Open Font License 1.1).
+- License: GPL-3.0-or-later.

@@ -1,0 +1,22 @@
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+
+[workspace.package]
+version = "1.0.0"
+edition = "2024"
+license = "GPL-3.0-or-later"
+
+[workspace.dependencies]
+soundcore-protocol = { path = "crates/soundcore-protocol" }
+soundcore-bt = { path = "crates/soundcore-bt" }
+objc2 = "0.6.5"
+objc2-foundation = "0.3.2"
+objc2-core-foundation = "0.3.2"
+objc2-io-bluetooth = "0.3.2"
+block2 = "0.6.2"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = true
