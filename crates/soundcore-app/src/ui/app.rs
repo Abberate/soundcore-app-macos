@@ -13,6 +13,7 @@ use super::theme::{self, pal, set_palette};
 use super::widgets::{self, ButtonKind, fit_text};
 use super::{art, theme::DARK, theme::LIGHT};
 use crate::session::{Action, Notice, Phase, SessionHandle, Snapshot, Target};
+use soundcore_protocol::AmbientMode;
 
 pub const APP_NAME: &str = "Soundcore App";
 pub const HEADER_H: f32 = 64.0;
@@ -56,6 +57,8 @@ pub enum ThemePref {
 
 pub struct SoundcoreApp {
     pub(super) icon: art::IconTextures,
+    /// The status item is installed: closing the window hides it instead of quitting.
+    menubar: bool,
     pub(super) session: SessionHandle,
     pub(super) tab: Tab,
     pub(super) modal: Modal,
@@ -127,6 +130,7 @@ impl SoundcoreApp {
         let test_run = demo || std::env::vars().any(|(k, _)| k.starts_with("SOUNDCORE_"));
         let mut app = Self {
             icon,
+            menubar: false,
             session,
             tab: Tab::Controls,
             modal: Modal::None,
@@ -170,6 +174,20 @@ impl SoundcoreApp {
                 "connect" => app.force_connect = true,
                 _ => {}
             }
+        }
+        // Menu bar item (not for automated screenshots and checks).
+        if app.screenshot.is_none() && std::env::var_os("SOUNDCORE_CHECK_TEXT").is_none() {
+            let (s1, s2) = (app.session.clone(), app.session.clone());
+            app.menubar = crate::menubar::install(
+                &cc.egui_ctx,
+                &art::menu_bar_png(),
+                Box::new(move || menu_model(&s1.snapshot())),
+                Box::new(move |action| {
+                    if let Some(m) = ambient_from_action(action) {
+                        s2.act(Action::SetAmbient(m));
+                    }
+                }),
+            );
         }
         app
     }
@@ -767,6 +785,25 @@ impl eframe::App for SoundcoreApp {
     fn ui(&mut self, ui: &mut Ui, _frame: &mut eframe::Frame) {
         let now = ui.input(|i| i.time);
         set_lang(self.current_lang());
+        // Visual check of the menu bar behaviour: simulate the close button.
+        if let Some(n) = std::env::var("SOUNDCORE_TEST_CLOSE_AFTER")
+            .ok()
+            .and_then(|v| v.parse::<u32>().ok())
+        {
+            self.frames += 1;
+            if self.frames == n {
+                ui.ctx().send_viewport_cmd(ViewportCommand::Close);
+            }
+            ui.ctx().request_repaint();
+        }
+        // The close button hides the window to the menu bar; Quit really quits.
+        if self.menubar
+            && ui.input(|i| i.viewport().close_requested())
+            && !crate::menubar::quitting()
+        {
+            ui.ctx().send_viewport_cmd(ViewportCommand::CancelClose);
+            crate::menubar::hide_window();
+        }
         self.apply_theme(ui);
         let screen = ui.max_rect();
         let pl = pal();
@@ -911,4 +948,86 @@ pub fn pill(p: &Painter, pos: Pos2, text: &str, fg: Color32, bg: Color32) -> Rec
     p.rect_filled(r, CornerRadius::same((r.height() / 2.0) as u8), bg);
     p.galley(r.center() - g.size() / 2.0, g, fg);
     r
+}
+
+fn ambient_action(m: AmbientMode) -> u32 {
+    match m {
+        AmbientMode::NoiseCanceling => 1,
+        AmbientMode::Normal => 2,
+        AmbientMode::Transparency => 3,
+    }
+}
+
+fn ambient_from_action(a: u32) -> Option<AmbientMode> {
+    match a {
+        1 => Some(AmbientMode::NoiseCanceling),
+        2 => Some(AmbientMode::Normal),
+        3 => Some(AmbientMode::Transparency),
+        _ => None,
+    }
+}
+
+/// What the menu bar item shows: device, battery and noise control.
+fn menu_model(snap: &Snapshot) -> crate::menubar::Model {
+    use crate::menubar::Line;
+    let st = &snap.state;
+    let mut lines = Vec::new();
+    match &snap.target {
+        None => lines.push(Line::Info(t(T::MenuNoDevice).to_string())),
+        Some(target) => {
+            let status = if snap.phase == Phase::Ready {
+                t(T::Connected)
+            } else {
+                t(T::NotConnected)
+            };
+            lines.push(Line::Info(format!("{} · {status}", target.name)));
+            let b = st.batteries;
+            let pct = |l: Option<soundcore_protocol::Level>, case: bool| {
+                l.map(|l| {
+                    let scale = if case { st.caps.case } else { st.caps.battery };
+                    format!(
+                        "{} %{}",
+                        scale.percent(l.level),
+                        if l.charging { " ⚡" } else { "" }
+                    )
+                })
+            };
+            if b.is_dual() {
+                let parts: Vec<String> = [
+                    (t(T::Left), pct(b.left, false)),
+                    (t(T::Right), pct(b.right, false)),
+                    (t(T::Case), pct(b.case, true)),
+                ]
+                .into_iter()
+                .filter_map(|(label, v)| v.map(|v| format!("{label} {v}")))
+                .collect();
+                lines.push(Line::Info(parts.join(" · ")));
+            } else if let Some(v) = pct(b.single, false) {
+                lines.push(Line::Info(format!("{} {v}", t(T::Battery))));
+            }
+            if !st.caps.ambient_modes.is_empty() {
+                lines.push(Line::Separator);
+                let current = st.sound_modes.map(|m| m.ambient);
+                let enabled = snap.phase == Phase::Ready && st.can_write_sound_modes();
+                for m in st.caps.ambient_modes {
+                    let title = match m {
+                        AmbientMode::NoiseCanceling => t(T::ModeAnc),
+                        AmbientMode::Normal => t(T::ModeNormal),
+                        AmbientMode::Transparency => t(T::ModeTransparency),
+                    };
+                    lines.push(Line::Item {
+                        title: title.to_string(),
+                        checked: current == Some(*m),
+                        enabled,
+                        action: ambient_action(*m),
+                    });
+                }
+            }
+        }
+    }
+    crate::menubar::Model {
+        lines,
+        open: t(T::MenuOpen).to_string(),
+        quit: t(T::MenuQuit).to_string(),
+    }
 }

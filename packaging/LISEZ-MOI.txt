@@ -1,4 +1,4 @@
-SOUNDCORE APP pour macOS — version 1.1.1
+SOUNDCORE APP pour macOS — version 1.1.2
 Application compagnon pour casques et écouteurs soundcore.
 
 APPLICATION NON OFFICIELLE ET NON HOMOLOGUÉE : elle n'est ni développée, ni
@@ -27,6 +27,9 @@ CE QUE FAIT L'APP
 - Égaliseur : les préréglages de l'appareil, ou votre propre courbe sur
   8 bandes (±6 dB) quand il le permet.
 - Informations : modèle, firmware, numéro de série, adresse Bluetooth.
+- Barre des menus : fermer la fenêtre ne quitte pas l'app. Elle reste en
+  haut de l'écran avec la batterie et le contrôle du bruit. « Ouvrir »
+  ramène la fenêtre, « Quitter » (ou ⌘Q) ferme l'app.
 - 5 langues (français, anglais, espagnol, allemand, italien), mode clair
   et sombre.
 
@@ -56,7 +59,7 @@ CRÉDITS
 
 -----------------------------------------------------------------------
 
-SOUNDCORE APP for macOS — version 1.1.1
+SOUNDCORE APP for macOS — version 1.1.2
 Companion app for soundcore headphones and earbuds.
 
 UNOFFICIAL, NON-CERTIFIED APP: not developed, affiliated with, endorsed or
@@ -83,6 +86,9 @@ WHAT IT DOES
 - Equalizer: the device's presets, or your own 8-band curve (±6 dB) when
   it allows one.
 - Details: model, firmware, serial number, Bluetooth address.
+- Menu bar: closing the window doesn't quit the app. It stays at the top
+  of the screen with the battery and noise control. "Open" brings the
+  window back, "Quit" (or ⌘Q) quits.
 - 5 languages (English, French, Spanish, German, Italian), light and dark.
 
 INSTALL

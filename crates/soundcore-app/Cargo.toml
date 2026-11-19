@@ -26,7 +26,9 @@ crossbeam-channel = "0.5"
 serde = { version = "1", features = ["derive"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
-objc2-foundation = { workspace = true, features = ["NSLocale", "NSArray", "NSString"] }
+objc2 = { workspace = true }
+objc2-foundation = { workspace = true, features = ["NSLocale", "NSArray", "NSString", "NSData", "NSGeometry"] }
+objc2-app-kit = { version = "0.3.2", default-features = false, features = ["std", "NSApplication", "NSResponder", "NSWindow", "NSMenu", "NSMenuItem", "NSStatusBar", "NSStatusItem", "NSStatusBarButton", "NSButton", "NSControl", "NSView", "NSCell", "NSImage", "NSRunningApplication"] }
 
 [dev-dependencies]
 skrifa = "0.44"

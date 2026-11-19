@@ -348,3 +348,39 @@ pub fn draw_icon(p: &Painter, tex: &egui::TextureHandle, r: Rect) {
         Color32::WHITE,
     );
 }
+
+/// Menu bar glyph: black headphones on transparent, 36×36 px (shown at 18 pt).
+pub fn menu_bar_png() -> Vec<u8> {
+    const N: u32 = 36;
+    let rr = |px: f32, py: f32, cx: f32, cy: f32, hw: f32, hh: f32, r: f32| {
+        let qx = (px - cx).abs() - (hw - r);
+        let qy = (py - cy).abs() - (hh - r);
+        (qx.max(0.0).powi(2) + qy.max(0.0).powi(2)).sqrt() + qx.max(qy).min(0.0) - r
+    };
+    let inside = |px: f32, py: f32| {
+        let (cx, cy) = (18.0, 19.0);
+        let d = ((px - cx).powi(2) + (py - cy).powi(2)).sqrt();
+        let band = (d - 12.5).abs() <= 2.0 && py <= cy + 2.0;
+        let cups = [-1.0f32, 1.0]
+            .iter()
+            .any(|s| rr(px, py, cx + s * 11.5, 25.0, 3.6, 6.5, 3.0) <= 0.0);
+        band || cups
+    };
+    let mut img = image::RgbaImage::new(N, N);
+    for y in 0..N {
+        for x in 0..N {
+            let mut hits = 0;
+            for s in 0..16 {
+                let px = x as f32 + ((s % 4) as f32 + 0.5) / 4.0;
+                let py = y as f32 + ((s / 4) as f32 + 0.5) / 4.0;
+                if inside(px, py) {
+                    hits += 1;
+                }
+            }
+            img.put_pixel(x, y, image::Rgba([0, 0, 0, (hits * 255 / 16) as u8]));
+        }
+    }
+    let mut out = std::io::Cursor::new(Vec::new());
+    let _ = img.write_to(&mut out, image::ImageFormat::Png);
+    out.into_inner()
+}

@@ -46,6 +46,11 @@ fn app_icon() -> egui::IconData {
 
 fn main() -> eframe::Result {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
+    // Development aid: write the menu bar glyph and quit.
+    if let Some(out) = std::env::var_os("SOUNDCORE_DUMP_MENU_ICON") {
+        let _ = std::fs::write(out, soundcore_app::ui::art::menu_bar_png());
+        return Ok(());
+    }
     if let Some(out) = std::env::var_os("SOUNDCORE_DMG_BG") {
         // Installer artwork (see scripts/make_dmg.sh).
         let options = eframe::NativeOptions {

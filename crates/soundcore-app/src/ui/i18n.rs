@@ -319,6 +319,11 @@ strings! {
         "Questo modello accetta i preset qui sotto, senza curva personalizzata.",
     ],
 
+    // ---- menu bar ------------------------------------------------------------------
+    MenuOpen => ["Open Soundcore App", "Ouvrir Soundcore App", "Abrir Soundcore App", "Soundcore App öffnen", "Apri Soundcore App"],
+    MenuQuit => ["Quit Soundcore App", "Quitter Soundcore App", "Salir de Soundcore App", "Soundcore App beenden", "Esci da Soundcore App"],
+    MenuNoDevice => ["No device connected", "Aucun appareil connecté", "Ningún dispositivo conectado", "Kein Gerät verbunden", "Nessun dispositivo connesso"],
+
     // ---- equalizer presets ---------------------------------------------------------
     PresetSignature => ["soundcore Signature", "soundcore Signature", "soundcore Signature", "soundcore Signature", "soundcore Signature"],
     PresetAcoustic => ["Acoustic", "Acoustique", "Acústico", "Akustik", "Acustico"],
