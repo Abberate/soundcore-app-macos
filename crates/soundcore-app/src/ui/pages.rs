@@ -1194,9 +1194,8 @@ impl SoundcoreApp {
         let cw = 540.0f32.min(rect.width() - 48.0);
         let x0 = rect.center().x - cw / 2.0;
         let mut y = rect.top() + 24.0;
-        let art_r = Rect::from_center_size(pos2(rect.center().x, y + 96.0), vec2(190.0, 190.0));
-        p.circle_filled(art_r.center(), 92.0, pl.accent_soft);
-        art::headphones(p, art_r.shrink(12.0), pl.accent);
+        let art_r = Rect::from_center_size(pos2(rect.center().x, y + 96.0), vec2(176.0, 176.0));
+        art::draw_icon(p, &self.icon.large, art_r);
         y = art_r.bottom() + 22.0;
         fit_text(
             p,

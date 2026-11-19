@@ -1,4 +1,4 @@
-SOUNDCORE APP pour macOS — version 1.1.0
+SOUNDCORE APP pour macOS — version 1.1.1
 Application compagnon pour casques et écouteurs soundcore.
 
 APPLICATION NON OFFICIELLE ET NON HOMOLOGUÉE : elle n'est ni développée, ni
@@ -56,7 +56,7 @@ CRÉDITS
 
 -----------------------------------------------------------------------
 
-SOUNDCORE APP for macOS — version 1.1.0
+SOUNDCORE APP for macOS — version 1.1.1
 Companion app for soundcore headphones and earbuds.
 
 UNOFFICIAL, NON-CERTIFIED APP: not developed, affiliated with, endorsed or

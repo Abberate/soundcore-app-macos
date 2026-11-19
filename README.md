@@ -1,4 +1,4 @@
-# Soundcore App for macOS (unofficial) — v1.1.0
+# Soundcore App for macOS (unofficial) — v1.1.1
 
 A native macOS companion app, written in Rust, for **soundcore headphones and earbuds**. It knows about 40 soundcore products (see *Supported devices*), and other soundcore devices work through the commands they all share.
 Its look takes after the headphones' own mobile app: a light, airy layout with white cards and one vivid blue. It also has a dark mode, and it runs in five languages.
@@ -49,7 +49,7 @@ Speakers that use a different framing, such as the Motion+, are not supported.
 
 ## Install
 
-**From the installer:** download `Soundcore-App-1.1.0.dmg` from the [Releases page](https://github.com/Abberate/soundcore-app-macos/releases/latest), open it and drag *Soundcore App* onto *Applications*. The installer window shows the steps, and *Lisez-moi - Read me.txt* gives the details in French and English.
+**From the installer:** download `Soundcore-App-1.1.1.dmg` from the [Releases page](https://github.com/Abberate/soundcore-app-macos/releases/latest), open it and drag *Soundcore App* onto *Applications*. The installer window shows the steps, and *Lisez-moi - Read me.txt* gives the details in French and English.
 
 * The app is not signed by an identified Apple developer, so macOS may block the first launch. Go to System Settings > Privacy & Security, click **Open Anyway** and confirm. On macOS 14 or earlier, right-click the app and choose **Open** instead.
 * Allow **Bluetooth** access when macOS asks.

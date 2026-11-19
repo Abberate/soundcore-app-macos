@@ -55,6 +55,7 @@ pub enum ThemePref {
 }
 
 pub struct SoundcoreApp {
+    pub(super) icon: art::IconTextures,
     pub(super) session: SessionHandle,
     pub(super) tab: Tab,
     pub(super) modal: Modal,
@@ -98,6 +99,7 @@ fn parse_eq(s: &str) -> Option<[i16; 8]> {
 impl SoundcoreApp {
     pub fn new(cc: &eframe::CreationContext<'_>, demo: bool) -> Self {
         theme::install_fonts(&cc.egui_ctx);
+        let icon = art::load_icon(&cc.egui_ctx);
         let ctx = cc.egui_ctx.clone();
         let repaint = move || ctx.request_repaint();
         let session = if demo {
@@ -124,6 +126,7 @@ impl SoundcoreApp {
         });
         let test_run = demo || std::env::vars().any(|(k, _)| k.starts_with("SOUNDCORE_"));
         let mut app = Self {
+            icon,
             session,
             tab: Tab::Controls,
             modal: Modal::None,
@@ -248,7 +251,7 @@ impl SoundcoreApp {
             pos2(screen.left() + TRAFFIC_LIGHTS + 16.0, y),
             vec2(30.0, 30.0),
         );
-        art::app_mark(p, mark);
+        art::draw_icon(p, &self.icon.small, mark);
         let name_r = fit_text(
             p,
             pos2(mark.right() + 12.0, y),

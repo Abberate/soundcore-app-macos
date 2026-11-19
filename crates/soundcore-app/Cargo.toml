@@ -27,3 +27,6 @@ serde = { version = "1", features = ["derive"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2-foundation = { workspace = true, features = ["NSLocale", "NSArray", "NSString"] }
+
+[dev-dependencies]
+skrifa = "0.44"

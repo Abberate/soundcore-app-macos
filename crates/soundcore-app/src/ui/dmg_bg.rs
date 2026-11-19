@@ -17,13 +17,19 @@ const APPLICATIONS_ICON: Pos2 = pos2(550.0, 200.0);
 pub struct DmgBackground {
     out: std::path::PathBuf,
     frames: u32,
+    icon: art::IconTextures,
 }
 
 impl DmgBackground {
     pub fn new(cc: &eframe::CreationContext<'_>, out: std::path::PathBuf) -> Self {
         theme::install_fonts(&cc.egui_ctx);
         cc.egui_ctx.set_zoom_factor(1.0);
-        Self { out, frames: 0 }
+        let icon = art::load_icon(&cc.egui_ctx);
+        Self {
+            out,
+            frames: 0,
+            icon,
+        }
     }
 }
 
@@ -41,8 +47,9 @@ impl eframe::App for DmgBackground {
         let title = p.layout_no_wrap("Soundcore App".into(), theme::semibold(26.0), pl.text);
         let total = 34.0 + 12.0 + title.size().x;
         let left = cx - total / 2.0;
-        art::app_mark(
+        art::draw_icon(
             p,
+            &self.icon.small,
             egui::Rect::from_min_size(at(left, 33.0), vec2(34.0, 34.0)),
         );
         p.galley(at(left + 46.0, 50.0 - title.size().y / 2.0), title, pl.text);

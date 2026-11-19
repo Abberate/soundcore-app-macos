@@ -223,26 +223,6 @@ pub fn icon_eq(p: &Painter, c: Pos2, size: f32, color: Color32) {
     }
 }
 
-/// The app mark: rounded square with a headphone glyph.
-pub fn app_mark(p: &Painter, r: Rect) {
-    let pl = pal();
-    p.rect_filled(r, CornerRadius::same((r.width() * 0.28) as u8), pl.accent);
-    let c = r.center() + vec2(0.0, r.height() * 0.04);
-    let s = r.width() / 24.0;
-    let st = Stroke::new(2.0 * s, Color32::WHITE);
-    p.add(Shape::line(
-        arc_points(c, 7.0 * s, PI * 1.05, PI * 1.95, 24),
-        st,
-    ));
-    for side in [-1.0f32, 1.0] {
-        p.rect_filled(
-            Rect::from_center_size(c + vec2(side * 7.0 * s, 3.0 * s), vec2(3.4 * s, 7.0 * s)),
-            CornerRadius::same((1.6 * s) as u8),
-            Color32::WHITE,
-        );
-    }
-}
-
 /// Generic earbuds in front of their case, fitted in `r` (original drawing).
 pub fn earbuds(p: &Painter, r: Rect, accent: Color32) {
     let pl = pal();
@@ -331,5 +311,40 @@ pub fn info(p: &Painter, c: Pos2, size: f32, color: Color32) {
     p.line_segment(
         [c + vec2(0.0, -1.5 * s), c + vec2(0.0, 5.0 * s)],
         Stroke::new(2.2 * s, Color32::WHITE),
+    );
+}
+
+/// The app icon (same artwork as the bundle's AppIcon), as textures.
+pub struct IconTextures {
+    pub small: egui::TextureHandle,
+    pub large: egui::TextureHandle,
+}
+
+const ICON_PNG: &[u8] = include_bytes!("../../../../packaging/icon_1024.png");
+
+pub fn load_icon(ctx: &egui::Context) -> IconTextures {
+    let img = image::load_from_memory(ICON_PNG)
+        .expect("app icon")
+        .into_rgba8();
+    let make = |size: u32, name: &str| {
+        let r = image::imageops::resize(&img, size, size, image::imageops::FilterType::Lanczos3);
+        let ci =
+            egui::ColorImage::from_rgba_unmultiplied([size as usize, size as usize], r.as_raw());
+        ctx.load_texture(name, ci, egui::TextureOptions::LINEAR)
+    };
+    IconTextures {
+        small: make(128, "app-icon-small"),
+        large: make(512, "app-icon-large"),
+    }
+}
+
+/// Draws the icon so that its visible body (824 of 1024 px) fills `r`.
+pub fn draw_icon(p: &Painter, tex: &egui::TextureHandle, r: Rect) {
+    let full = r.expand(r.width() * (1024.0 / 824.0 - 1.0) / 2.0);
+    p.image(
+        tex.id(),
+        full,
+        Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
+        Color32::WHITE,
     );
 }
